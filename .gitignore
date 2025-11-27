@@ -24,11 +24,6 @@ desktop.ini
 *.log
 logs/
 
-# Database SQLite (se usato)
-*.sqlite
-*.sqlite3
-database.sqlite
-
 # Database JSON (se usato)
 db.json
 

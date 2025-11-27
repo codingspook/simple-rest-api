@@ -1,4 +1,4 @@
-# Template MVC REST API
+# Template Simple REST API
 
 Template minimale per creare backend REST API in PHP
 
@@ -7,13 +7,7 @@ Template minimale per creare backend REST API in PHP
 ### Tramite Composer create-project
 
 ```bash
-composer create-project docente/composer-project nome-progetto
-```
-
-Oppure se il progetto è pubblicato su un repository Git:
-
-```bash
-composer create-project docente/composer-project nome-progetto --repository-url=https://github.com/tuo-username/tuo-repo.git
+composer create-project codingspook/simple-rest-api nome-progetto
 ```
 
 ### Setup iniziale
