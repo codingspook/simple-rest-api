@@ -143,7 +143,7 @@ class DB
      * 
      * @param string $query Query INSERT con placeholders
      * @param array $bindings Valori da inserire
-     * @return int ID del record inserito
+     * @return int ID del record inserito (0 se non disponibile, es. tabelle pivot senza sequenza)
      * 
      * Esempi:
      *   DB::insert("INSERT INTO users (name, email) VALUES (:name, :email)", ['name' => 'Mario', 'email' => 'mario@example.com']);
@@ -154,7 +154,23 @@ class DB
         try {
             $stmt = self::connection()->prepare($query);
             $stmt->execute($bindings);
-            return (int)self::connection()->lastInsertId();
+            
+            // Per PostgreSQL, lastInsertId() può fallire se non c'è una sequenza nella tabella
+            // (es. tabelle pivot senza colonna id con sequenza)
+            // In questo caso, restituiamo 0 invece di lanciare un'eccezione
+            try {
+                $lastId = self::connection()->lastInsertId();
+                // Verifica se lastId è valido (non false, non vuoto, non null)
+                if ($lastId === false || $lastId === '' || $lastId === null) {
+                    return 0;
+                }
+                return (int)$lastId;
+            } catch (\Exception $e) {
+                // Se lastInsertId() fallisce (es. PostgreSQL senza sequenza), restituiamo 0
+                // Questo è normale per tabelle pivot senza colonna id con sequenza
+                // Catturiamo \Exception invece di solo PDOException per essere sicuri
+                return 0;
+            }
         } catch (PDOException $e) {
             throw new RuntimeException("Errore INSERT: " . $e->getMessage());
         }
