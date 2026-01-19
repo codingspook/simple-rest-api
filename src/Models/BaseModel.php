@@ -155,6 +155,88 @@ abstract class BaseModel
     }
 
     /**
+     * Filtra i record in base a una condizione WHERE
+     * 
+     * @param string $column Nome della colonna
+     * @param mixed $operator Operatore o valore (se si usa '=' come operatore di default)
+     * @param mixed $value Valore da confrontare (opzionale se $operator è il valore)
+     * @return array Array di modelli che soddisfano la condizione
+     */
+    public static function where(string $column, mixed $operator, mixed $value = null): array
+    {
+        // Se vengono passati solo 2 parametri, assume operatore '='
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+        
+        // Validazione operatore
+        $allowedOperators = ['=', '!=', '<>', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN'];
+        $operator = strtoupper($operator);
+        
+        if (!in_array($operator, $allowedOperators)) {
+            throw new \InvalidArgumentException("Operatore non valido: {$operator}");
+        }
+        
+        $models = [];
+        
+        if (static::$driver === 'json') {
+            // Gestione driver JSON
+            $collection = JSONDB::read(static::$collection);
+            $filtered = array_filter($collection, function($item) use ($column, $operator, $value) {
+                if (!isset($item[$column])) {
+                    return false;
+                }
+                
+                $columnValue = $item[$column];
+                
+                return match($operator) {
+                    '=' => $columnValue == $value,
+                    '!=', '<>' => $columnValue != $value,
+                    '>' => $columnValue > $value,
+                    '<' => $columnValue < $value,
+                    '>=' => $columnValue >= $value,
+                    '<=' => $columnValue <= $value,
+                    'LIKE' => str_contains(strtolower($columnValue), strtolower(str_replace('%', '', $value))),
+                    'NOT LIKE' => !str_contains(strtolower($columnValue), strtolower(str_replace('%', '', $value))),
+                    'IN' => is_array($value) && in_array($columnValue, $value),
+                    'NOT IN' => is_array($value) && !in_array($columnValue, $value),
+                    default => false
+                };
+            });
+            
+            $models = array_map(fn($row) => new static($row), array_values($filtered));
+        } else {
+            // Gestione driver database
+            if (in_array($operator, ['IN', 'NOT IN'])) {
+                // Gestione speciale per IN e NOT IN
+                if (!is_array($value)) {
+                    throw new \InvalidArgumentException("Il valore per gli operatori IN/NOT IN deve essere un array");
+                }
+                
+                $placeholders = implode(',', array_fill(0, count($value), '?'));
+                $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} ({$placeholders})";
+                $rows = DB::select($sql, array_values($value));
+            } else {
+                // Query normale con placeholder nominale
+                $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} :value";
+                $rows = DB::select($sql, ['value' => $value]);
+            }
+            
+            $models = array_map(fn($row) => new static($row), $rows);
+        }
+        
+        // Se ci sono relazioni da caricare con eager loading, caricale
+        if (!empty(static::$eagerLoad)) {
+            static::eagerLoadRelations($models);
+            // Reset dopo l'uso
+            static::$eagerLoad = [];
+        }
+        
+        return $models;
+    }
+
+    /**
      * Inserisce un nuovo record nel database
      */
     public static function create(array $data): static

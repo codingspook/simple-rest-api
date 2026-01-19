@@ -1,4 +1,4 @@
-# DB implementation example with Simple Rest API
+# Simple Rest API
 
 Template minimale per creare backend REST API in PHP
 
@@ -12,13 +12,13 @@ composer create-project codingspook/simple-rest-api nome-progetto
 
 ### Setup iniziale
 
-1. **Installa le dipendenze** (se non già fatto):
+1. **Configura il web server** per puntare alla directory `public/` (se non è già configurato)
 
-```bash
-composer install
-```
+2. **Configura la connessione al database** in `config/database.php`
 
-2. **Configura il web server** per puntare alla directory `public/`
+3. **Configura il CORS** in `config/cors.php`
+
+4. **Configura le route** in `routes/index.php`
 
 ## Struttura del Progetto
 
