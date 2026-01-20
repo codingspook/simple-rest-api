@@ -141,7 +141,7 @@ trait WithValidate
                         }
                     } else if(is_numeric($value)) {
                         if($value < (int)$param) {
-                            return $customMessage ?? "Il campo {$field} deve avere almeno {$param} caratteri";
+                            return $customMessage ?? "Il campo {$field} deve essere maggiore o uguale a {$param}";
                         }
                     }
                 }
@@ -155,7 +155,7 @@ trait WithValidate
                         }
                     } else if(is_numeric($value)) {
                         if($value > (int)$param) {
-                            return $customMessage ?? "Il campo {$field} non può avere più di {$param} caratteri";
+                            return $customMessage ?? "Il campo {$field} deve essere minore o uguale a {$param}";
                         }
                     }
                 }
