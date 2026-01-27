@@ -160,20 +160,29 @@ abstract class BaseModel
      * @param string $column Nome della colonna
      * @param mixed $operator Operatore o valore (se si usa '=' come operatore di default)
      * @param mixed $value Valore da confrontare (opzionale se $operator è il valore)
+     * @param string|array|null $relations Relazioni da caricare con eager loading (opzionale)
      * @return array Array di modelli che soddisfano la condizione
      */
-    public static function where(string $column, mixed $operator, mixed $value = null): array
+    public static function where(string $column, mixed $operator, mixed $value = null, string|array|null $relations = null): array
     {
-        // Se vengono passati solo 2 parametri, assume operatore '='
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
+        // Se viene passato $relations come parametro, imposta eagerLoad
+        if ($relations !== null) {
+            static::$eagerLoad = is_array($relations) ? $relations : [$relations];
         }
         
-        // Validazione operatore
+        // Validazione operatore - controlla se $operator è un operatore valido
         $allowedOperators = ['=', '!=', '<>', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN'];
-        $operator = strtoupper($operator);
+        $operatorUpper = strtoupper($operator);
         
+        // Se $value è null e $operator non è un operatore valido, allora $operator è il valore
+        if ($value === null && !in_array($operatorUpper, $allowedOperators)) {
+            $value = $operator;
+            $operator = '=';
+        } else {
+            $operator = $operatorUpper;
+        }
+        
+        // Validazione finale operatore
         if (!in_array($operator, $allowedOperators)) {
             throw new \InvalidArgumentException("Operatore non valido: {$operator}");
         }
@@ -208,6 +217,15 @@ abstract class BaseModel
             $models = array_map(fn($row) => new static($row), array_values($filtered));
         } else {
             // Gestione driver database
+            // Se ci sono relazioni da caricare con eager loading, usa JOIN
+            if (!empty(static::$eagerLoad)) {
+                $models = static::whereWithJoins($column, $operator, $value);
+                // Le relazioni sono già caricate nei modelli, reset eagerLoad
+                static::$eagerLoad = [];
+                return $models;
+            }
+            
+            // Query normale senza JOIN
             if (in_array($operator, ['IN', 'NOT IN'])) {
                 // Gestione speciale per IN e NOT IN
                 if (!is_array($value)) {
@@ -345,7 +363,7 @@ abstract class BaseModel
     }
 
     /**
-     * Metodo magico per intercettare chiamate a metodi quando viene usato with()->find() o with()->all()
+     * Metodo magico per intercettare chiamate a metodi quando viene usato with()->find(), with()->all() o with()->where()
      * 
      * @param string $method Nome del metodo chiamato
      * @param array $arguments Argomenti passati al metodo
@@ -361,6 +379,15 @@ abstract class BaseModel
         
         if ($method === 'all' && empty($arguments)) {
             return static::all();
+        }
+        
+        // Se viene chiamato where() su un'istanza restituita da with(),
+        // chiama il metodo statico corrispondente mantenendo lo stato di eagerLoad
+        if ($method === 'where' && count($arguments) >= 2) {
+            // where() può avere 2, 3 o 4 parametri: (column, operator, value, relations)
+            // Ma se viene chiamato dopo with(), le relazioni sono già in static::$eagerLoad
+            // quindi passiamo solo i primi 3 parametri (column, operator, value)
+            return static::where(...$arguments);
         }
 
         // Se il metodo non esiste, lancia un'eccezione

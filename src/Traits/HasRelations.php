@@ -711,6 +711,93 @@ trait HasRelations
     }
 
     /**
+     * Filtra i record con JOIN per le relazioni eager load
+     * 
+     * @param string $column Nome della colonna
+     * @param string $operator Operatore SQL
+     * @param mixed $value Valore da confrontare
+     * @return array Array di modelli con relazioni caricate
+     */
+    protected static function whereWithJoins(string $column, string $operator, mixed $value): array
+    {
+        $mainTable = static::getTableName();
+        $mainTableAlias = 'main';
+        $selects = ["{$mainTableAlias}.*"];
+        $joins = [];
+        $relationInfo = [];
+        
+        // Costruisce JOIN per ogni relazione eager load
+        foreach (static::$eagerLoad as $relation) {
+            $parts = explode('.', $relation);
+            $firstRelation = $parts[0];
+            
+            // Verifica se esiste il metodo relazione
+            $sampleModel = new static();
+            if (!method_exists($sampleModel, $firstRelation) || !$sampleModel->isRelationMethod($firstRelation)) {
+                continue;
+            }
+            
+            // Costruisce il JOIN appropriato
+            $joinInfo = static::buildJoinForRelation($firstRelation, $mainTableAlias);
+            if ($joinInfo) {
+                $joins[] = $joinInfo['join'];
+                $selects[] = $joinInfo['select'];
+                $relationInfo[$firstRelation] = $joinInfo;
+            }
+        }
+        
+        // Se non ci sono JOIN da fare, usa il metodo normale
+        if (empty($joins)) {
+            // Query normale senza JOIN
+            if (in_array($operator, ['IN', 'NOT IN'])) {
+                if (!is_array($value)) {
+                    throw new \InvalidArgumentException("Il valore per gli operatori IN/NOT IN deve essere un array");
+                }
+                $placeholders = implode(',', array_fill(0, count($value), '?'));
+                $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} ({$placeholders})";
+                $rows = DB::select($sql, array_values($value));
+            } else {
+                $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} :value";
+                $rows = DB::select($sql, ['value' => $value]);
+            }
+            $models = array_map(fn($row) => new static($row), $rows);
+            // Carica le relazioni usando il metodo normale
+            static::eagerLoadRelations($models);
+            static::$eagerLoad = [];
+            return $models;
+        }
+        
+        // Costruisce la query finale con JOIN
+        $query = "SELECT " . implode(", ", $selects) . " FROM {$mainTable} AS {$mainTableAlias}";
+        if (!empty($joins)) {
+            $query .= " " . implode(" ", $joins);
+        }
+        
+        // Aggiunge la condizione WHERE
+        $bindings = [];
+        if (in_array($operator, ['IN', 'NOT IN'])) {
+            if (!is_array($value)) {
+                throw new \InvalidArgumentException("Il valore per gli operatori IN/NOT IN deve essere un array");
+            }
+            $placeholders = [];
+            foreach ($value as $index => $val) {
+                $key = "value{$index}";
+                $placeholders[] = ":{$key}";
+                $bindings[$key] = $val;
+            }
+            $query .= " WHERE {$mainTableAlias}.{$column} {$operator} (" . implode(',', $placeholders) . ")";
+        } else {
+            $query .= " WHERE {$mainTableAlias}.{$column} {$operator} :value";
+            $bindings['value'] = $value;
+        }
+        
+        $rows = DB::select($query, $bindings);
+        
+        // Separa i risultati JOIN nei modelli corretti
+        return static::separateJoinResults($rows, $relationInfo, $mainTableAlias);
+    }
+
+    /**
      * Costruisce il JOIN SQL per una relazione
      * 
      * @param string $relationName Nome della relazione
