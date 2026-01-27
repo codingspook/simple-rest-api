@@ -727,6 +727,7 @@ trait HasRelations
         $relationInfo = [];
         
         // Costruisce JOIN per ogni relazione eager load
+        $hasValidRelations = false;
         foreach (static::$eagerLoad as $relation) {
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
@@ -736,6 +737,8 @@ trait HasRelations
             if (!method_exists($sampleModel, $firstRelation) || !$sampleModel->isRelationMethod($firstRelation)) {
                 continue;
             }
+            
+            $hasValidRelations = true;
             
             // Costruisce il JOIN appropriato
             $joinInfo = static::buildJoinForRelation($firstRelation, $mainTableAlias);

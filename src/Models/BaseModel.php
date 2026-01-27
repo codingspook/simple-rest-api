@@ -165,20 +165,24 @@ abstract class BaseModel
      */
     public static function where(string $column, mixed $operator, mixed $value = null, string|array|null $relations = null): array
     {
-        // Se viene passato $relations come parametro, imposta eagerLoad
-        if ($relations !== null) {
+        $numArgs = func_num_args();
+        
+        // Se viene passato $relations come parametro (4 argomenti), imposta eagerLoad
+        if ($numArgs >= 4 && $relations !== null) {
             static::$eagerLoad = is_array($relations) ? $relations : [$relations];
         }
         
         // Validazione operatore - controlla se $operator è un operatore valido
         $allowedOperators = ['=', '!=', '<>', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN'];
-        $operatorUpper = strtoupper($operator);
+        $operatorUpper = is_string($operator) ? strtoupper($operator) : '';
         
-        // Se $value è null e $operator non è un operatore valido, allora $operator è il valore
-        if ($value === null && !in_array($operatorUpper, $allowedOperators)) {
+        // Se vengono passati solo 2 parametri, allora $operator è il valore
+        // Se vengono passati 3 parametri e $value è null e $operator non è un operatore valido, allora $operator è il valore
+        // Se vengono passati 4 parametri, assumiamo sempre che sia ($column, $operator, $value, $relations)
+        if ($numArgs === 2 || ($numArgs === 3 && $value === null && !in_array($operatorUpper, $allowedOperators))) {
             $value = $operator;
             $operator = '=';
-        } else {
+        } elseif (is_string($operator)) {
             $operator = $operatorUpper;
         }
         
