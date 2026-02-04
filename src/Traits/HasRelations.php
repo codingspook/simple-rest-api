@@ -42,7 +42,7 @@ trait HasRelations
 
         // Usa il driver del modello correlato (se disponibile) o quello corrente come fallback
         $driver = $this->getRelatedDriver($related);
-        
+
         if ($driver === 'json') {
             // Per JSON, mantieni il comportamento originale
             $relatedCollection = $this->readRelatedCollection($related);
@@ -65,7 +65,7 @@ trait HasRelations
                 "SELECT * FROM {$tableName} WHERE {$foreignKey} = :localValue",
                 ['localValue' => $localValue]
             );
-            
+
             return array_map(fn($row) => new $related($row), $rows);
         }
     }
@@ -95,7 +95,7 @@ trait HasRelations
 
         // Usa il driver del modello correlato (se disponibile) o quello corrente come fallback
         $driver = $this->getRelatedDriver($related);
-        
+
         if ($driver === 'json') {
             // Per JSON, mantieni il comportamento originale
             $relatedCollection = $this->readRelatedCollection($related);
@@ -116,7 +116,7 @@ trait HasRelations
                 "SELECT * FROM {$tableName} WHERE {$ownerKey} = :foreignValue",
                 ['foreignValue' => $foreignValue]
             );
-            
+
             return !empty($rows) ? new $related($rows[0]) : null;
         }
     }
@@ -143,7 +143,7 @@ trait HasRelations
 
         // Usa il driver del modello correlato (se disponibile) o quello corrente come fallback
         $driver = $this->getRelatedDriver($related);
-        
+
         if ($driver === 'json') {
             // Per JSON, mantieni il comportamento originale
             $relatedCollection = $this->readRelatedCollection($related);
@@ -164,7 +164,7 @@ trait HasRelations
                 "SELECT * FROM {$tableName} WHERE {$foreignKey} = :localValue LIMIT 1",
                 ['localValue' => $localValue]
             );
-            
+
             return !empty($rows) ? new $related($rows[0]) : null;
         }
     }
@@ -219,7 +219,7 @@ trait HasRelations
 
         // Usa il driver del modello correlato (se disponibile) o quello corrente come fallback
         $driver = $this->getRelatedDriver($related);
-        
+
         if ($driver === 'json') {
             // Per JSON, legge dalla collection pivot
             $pivotCollection = JSONDB::read($table);
@@ -259,7 +259,7 @@ trait HasRelations
                 INNER JOIN {$table} ON {$relatedTable}.{$relatedKey} = {$table}.{$relatedPivotKey}
                 WHERE {$table}.{$foreignPivotKey} = :localValue
             ";
-            
+
             $rows = DB::select($query, ['localValue' => $localValue]);
             return array_map(fn($row) => new $related($row), $rows);
         }
@@ -324,8 +324,10 @@ trait HasRelations
                 // Verifica se il record esiste già
                 $exists = false;
                 foreach ($pivotCollection as $pivotItem) {
-                    if (isset($pivotItem[$foreignPivotKey]) && $pivotItem[$foreignPivotKey] === $localValue &&
-                        isset($pivotItem[$relatedPivotKey]) && $pivotItem[$relatedPivotKey] === $id) {
+                    if (
+                        isset($pivotItem[$foreignPivotKey]) && $pivotItem[$foreignPivotKey] === $localValue &&
+                        isset($pivotItem[$relatedPivotKey]) && $pivotItem[$relatedPivotKey] === $id
+                    ) {
                         $exists = true;
                         break;
                     }
@@ -417,13 +419,13 @@ trait HasRelations
 
             if ($ids === null) {
                 // Rimuove tutti i record per questo modello
-                $pivotCollection = array_filter($pivotCollection, function($item) use ($foreignPivotKey, $localValue) {
+                $pivotCollection = array_filter($pivotCollection, function ($item) use ($foreignPivotKey, $localValue) {
                     return !isset($item[$foreignPivotKey]) || $item[$foreignPivotKey] !== $localValue;
                 });
             } else {
                 // Rimuove solo gli ID specificati
                 $ids = is_array($ids) ? $ids : [$ids];
-                $pivotCollection = array_filter($pivotCollection, function($item) use ($foreignPivotKey, $relatedPivotKey, $localValue, $ids) {
+                $pivotCollection = array_filter($pivotCollection, function ($item) use ($foreignPivotKey, $relatedPivotKey, $localValue, $ids) {
                     if (!isset($item[$foreignPivotKey]) || $item[$foreignPivotKey] !== $localValue) {
                         return true; // Mantieni record di altri modelli
                     }
@@ -480,12 +482,12 @@ trait HasRelations
     ): void {
         // Prima rimuove tutti i record esistenti
         $this->detach($related, null, $table, $foreignPivotKey, $relatedPivotKey);
-        
+
         // Poi aggiunge solo quelli specificati
         if (!empty($ids)) {
             $this->attach($related, $ids, $table, $foreignPivotKey, $relatedPivotKey);
         }
-        
+
         // Nota: attach() e detach() invalidano già la cache della relazione
         // Come Laravel, non ricarica automaticamente - devi chiamare load() se necessario
     }
@@ -552,8 +554,10 @@ trait HasRelations
             foreach ($ids as $id) {
                 $exists = false;
                 foreach ($pivotCollection as $pivotItem) {
-                    if (isset($pivotItem[$foreignPivotKey]) && $pivotItem[$foreignPivotKey] === $localValue &&
-                        isset($pivotItem[$relatedPivotKey]) && $pivotItem[$relatedPivotKey] === $id) {
+                    if (
+                        isset($pivotItem[$foreignPivotKey]) && $pivotItem[$foreignPivotKey] === $localValue &&
+                        isset($pivotItem[$relatedPivotKey]) && $pivotItem[$relatedPivotKey] === $id
+                    ) {
                         $exists = true;
                         break;
                     }
@@ -588,7 +592,7 @@ trait HasRelations
         if (!empty($toDetach)) {
             $this->detach($related, $toDetach, $table, $foreignPivotKey, $relatedPivotKey);
         }
-        
+
         // Nota: attach() e detach() invalidano già la cache della relazione
         // Come Laravel, non ricarica automaticamente - devi chiamare load() se necessario
     }
@@ -609,24 +613,24 @@ trait HasRelations
         $selects = ["{$mainTableAlias}.*"];
         $joins = [];
         $relationInfo = [];
-        
+
         // Costruisce JOIN per ogni relazione eager load
         foreach (static::$eagerLoad as $relation) {
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
-            
+
             // Verifica se esiste il metodo relazione
             $sampleModel = new static();
             if (!method_exists($sampleModel, $firstRelation) || !$sampleModel->isRelationMethod($firstRelation)) {
                 continue;
             }
-            
+
             // Usa reflection per chiamare il metodo protetto e capire il tipo di relazione
             $reflection = new \ReflectionClass($sampleModel);
             $method = $reflection->getMethod($firstRelation);
             // PHP 8.1+ non richiede setAccessible() - i metodi sono accessibili per default
             $relationResult = $method->invoke($sampleModel);
-            
+
             // Determina il tipo di relazione e costruisce il JOIN appropriato
             $joinInfo = static::buildJoinForRelation($firstRelation, $mainTableAlias);
             if ($joinInfo) {
@@ -635,15 +639,15 @@ trait HasRelations
                 $relationInfo[$firstRelation] = $joinInfo;
             }
         }
-        
+
         // Costruisce la query finale
         $query = "SELECT " . implode(", ", $selects) . " FROM {$mainTable} AS {$mainTableAlias}";
         if (!empty($joins)) {
             $query .= " " . implode(" ", $joins);
         }
-        
+
         $rows = DB::select($query);
-        
+
         // Separa i risultati JOIN nei modelli corretti
         return static::separateJoinResults($rows, $relationInfo, $mainTableAlias);
     }
@@ -661,18 +665,18 @@ trait HasRelations
         $selects = ["{$mainTableAlias}.*"];
         $joins = [];
         $relationInfo = [];
-        
+
         // Costruisce JOIN per ogni relazione eager load
         foreach (static::$eagerLoad as $relation) {
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
-            
+
             // Verifica se esiste il metodo relazione
             $sampleModel = new static();
             if (!method_exists($sampleModel, $firstRelation) || !$sampleModel->isRelationMethod($firstRelation)) {
                 continue;
             }
-            
+
             // Costruisce il JOIN appropriato
             $joinInfo = static::buildJoinForRelation($firstRelation, $mainTableAlias);
             if ($joinInfo) {
@@ -682,7 +686,7 @@ trait HasRelations
                 $relationInfo[$firstRelation] = $joinInfo;
             }
         }
-        
+
         // Se non ci sono JOIN da fare, usa il metodo normale
         if (empty($joins)) {
             $result = DB::select("SELECT * FROM " . static::getTableName() . " WHERE id = :id", ['id' => $id]);
@@ -696,16 +700,16 @@ trait HasRelations
             static::$eagerLoad = [];
             return [$model];
         }
-        
+
         // Costruisce la query finale
         $query = "SELECT " . implode(", ", $selects) . " FROM {$mainTable} AS {$mainTableAlias}";
         if (!empty($joins)) {
             $query .= " " . implode(" ", $joins);
         }
         $query .= " WHERE {$mainTableAlias}.id = :id";
-        
+
         $rows = DB::select($query, ['id' => $id]);
-        
+
         // Separa i risultati JOIN nei modelli corretti
         return static::separateJoinResults($rows, $relationInfo, $mainTableAlias);
     }
@@ -725,21 +729,21 @@ trait HasRelations
         $selects = ["{$mainTableAlias}.*"];
         $joins = [];
         $relationInfo = [];
-        
+
         // Costruisce JOIN per ogni relazione eager load
         $hasValidRelations = false;
         foreach (static::$eagerLoad as $relation) {
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
-            
+
             // Verifica se esiste il metodo relazione
             $sampleModel = new static();
             if (!method_exists($sampleModel, $firstRelation) || !$sampleModel->isRelationMethod($firstRelation)) {
                 continue;
             }
-            
+
             $hasValidRelations = true;
-            
+
             // Costruisce il JOIN appropriato
             $joinInfo = static::buildJoinForRelation($firstRelation, $mainTableAlias);
             if ($joinInfo) {
@@ -748,7 +752,7 @@ trait HasRelations
                 $relationInfo[$firstRelation] = $joinInfo;
             }
         }
-        
+
         // Se non ci sono JOIN da fare, usa il metodo normale
         if (empty($joins)) {
             // Query normale senza JOIN
@@ -756,12 +760,18 @@ trait HasRelations
                 if (!is_array($value)) {
                     throw new \InvalidArgumentException("Il valore per gli operatori IN/NOT IN deve essere un array");
                 }
-                $placeholders = implode(',', array_fill(0, count($value), '?'));
+                // Convertiamo i boolean in interi per evitare problemi con PDO che li converte in stringhe vuote
+                $convertedValues = array_map(function ($val) {
+                    return is_bool($val) ? ($val ? 1 : 0) : $val;
+                }, $value);
+                $placeholders = implode(',', array_fill(0, count($convertedValues), '?'));
                 $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} ({$placeholders})";
-                $rows = DB::select($sql, array_values($value));
+                $rows = DB::select($sql, array_values($convertedValues));
             } else {
+                // Convertiamo i boolean in interi per evitare problemi con PDO che li converte in stringhe vuote
+                $convertedValue = is_bool($value) ? ($value ? 1 : 0) : $value;
                 $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} :value";
-                $rows = DB::select($sql, ['value' => $value]);
+                $rows = DB::select($sql, ['value' => $convertedValue]);
             }
             $models = array_map(fn($row) => new static($row), $rows);
             // Carica le relazioni usando il metodo normale
@@ -769,13 +779,13 @@ trait HasRelations
             static::$eagerLoad = [];
             return $models;
         }
-        
+
         // Costruisce la query finale con JOIN
         $query = "SELECT " . implode(", ", $selects) . " FROM {$mainTable} AS {$mainTableAlias}";
         if (!empty($joins)) {
             $query .= " " . implode(" ", $joins);
         }
-        
+
         // Aggiunge la condizione WHERE
         $bindings = [];
         if (in_array($operator, ['IN', 'NOT IN'])) {
@@ -786,16 +796,18 @@ trait HasRelations
             foreach ($value as $index => $val) {
                 $key = "value{$index}";
                 $placeholders[] = ":{$key}";
-                $bindings[$key] = $val;
+                // Convertiamo i boolean in interi per evitare problemi con PDO che li converte in stringhe vuote
+                $bindings[$key] = is_bool($val) ? ($val ? 1 : 0) : $val;
             }
             $query .= " WHERE {$mainTableAlias}.{$column} {$operator} (" . implode(',', $placeholders) . ")";
         } else {
             $query .= " WHERE {$mainTableAlias}.{$column} {$operator} :value";
-            $bindings['value'] = $value;
+            // Convertiamo i boolean in interi per evitare problemi con PDO che li converte in stringhe vuote
+            $bindings['value'] = is_bool($value) ? ($value ? 1 : 0) : $value;
         }
-        
+
         $rows = DB::select($query, $bindings);
-        
+
         // Separa i risultati JOIN nei modelli corretti
         return static::separateJoinResults($rows, $relationInfo, $mainTableAlias);
     }
@@ -818,30 +830,30 @@ trait HasRelations
         $reflection = new \ReflectionClass($sampleModel);
         $method = $reflection->getMethod($relationName);
         // PHP 8.1+ non richiede setAccessible() - i metodi sono accessibili per default
-        
+
         // Legge il codice sorgente del metodo per capire il tipo di relazione
         $filename = $method->getFileName();
         $startLine = $method->getStartLine();
         $endLine = $method->getEndLine();
         $fileLines = file($filename);
         $methodCode = implode('', array_slice($fileLines, $startLine - 1, $endLine - $startLine + 1));
-        
+
         // Determina il tipo di relazione e la classe correlata
         $isBelongsTo = strpos($methodCode, 'belongsTo') !== false && strpos($methodCode, 'belongsToMany') === false;
         $isBelongsToMany = strpos($methodCode, 'belongsToMany') !== false;
         $isHasMany = strpos($methodCode, 'hasMany') !== false;
         $isHasOne = strpos($methodCode, 'hasOne') !== false;
-        
+
         if (!$isBelongsTo && !$isBelongsToMany && !$isHasMany && !$isHasOne) {
             return null;
         }
-        
+
         // Estrae la classe correlata dal codice
         preg_match('/belongsToMany\(\s*([^,)]+)/', $methodCode, $belongsToManyMatch);
         preg_match('/belongsTo\(\s*([^,)]+)/', $methodCode, $belongsToMatch);
         preg_match('/hasMany\(\s*([^,)]+)/', $methodCode, $hasManyMatch);
         preg_match('/hasOne\(\s*([^,)]+)/', $methodCode, $hasOneMatch);
-        
+
         $relatedClass = null;
         if (!empty($belongsToManyMatch[1])) {
             $relatedClass = trim($belongsToManyMatch[1], " '\" \t\n\r\0\x0B");
@@ -852,7 +864,7 @@ trait HasRelations
         } elseif (!empty($hasOneMatch[1])) {
             $relatedClass = trim($hasOneMatch[1], " '\" \t\n\r\0\x0B");
         }
-        
+
         // Gestisce il caso in cui la classe è referenziata come Post::class
         if ($relatedClass && strpos($relatedClass, '::class') !== false) {
             $relatedClass = trim(str_replace('::class', '', $relatedClass));
@@ -862,15 +874,15 @@ trait HasRelations
                 $relatedClass = $currentNamespace . '\\' . $relatedClass;
             }
         }
-        
+
         if (!$relatedClass || !class_exists($relatedClass)) {
             return null;
         }
-        
+
         // Ottiene il nome della tabella correlata
         $relatedTable = static::getRelatedTableNameStatic($relatedClass);
         $relatedAlias = $relationName;
-        
+
         // Ottiene i campi della tabella correlata usando reflection
         $relatedReflection = new \ReflectionClass($relatedClass);
         $relatedProperties = $relatedReflection->getProperties(\ReflectionProperty::IS_PUBLIC);
@@ -882,7 +894,7 @@ trait HasRelations
                 $relatedFields[] = "{$relatedAlias}.{$propName} AS {$relatedAlias}_{$propName}";
             }
         }
-        
+
         // Costruisce il JOIN in base al tipo di relazione
         if ($isBelongsTo) {
             // belongsTo: JOIN sulla foreign key del modello corrente
@@ -898,12 +910,12 @@ trait HasRelations
             sort($tables);
             $pivotTable = implode('_', $tables);
             $pivotAlias = 'pivot_' . $relationName;
-            
+
             $foreignPivotKey = strtolower($currentModelName) . '_id';
             $relatedPivotKey = strtolower($relatedModelName) . '_id';
-            
+
             $join = "LEFT JOIN {$pivotTable} AS {$pivotAlias} ON {$mainTableAlias}.id = {$pivotAlias}.{$foreignPivotKey} " .
-                   "LEFT JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$relatedPivotKey} = {$relatedAlias}.id";
+                "LEFT JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$relatedPivotKey} = {$relatedAlias}.id";
             $select = implode(", ", $relatedFields);
         } elseif ($isHasMany || $isHasOne) {
             // hasMany/hasOne: JOIN sulla foreign key del modello correlato
@@ -914,7 +926,7 @@ trait HasRelations
         } else {
             return null;
         }
-        
+
         return [
             'join' => $join,
             'select' => $select,
@@ -966,17 +978,17 @@ trait HasRelations
         if (empty($rows)) {
             return [];
         }
-        
+
         $results = [];
         $groupedByMainId = [];
-        
+
         // Raggruppa i risultati per ID principale
         foreach ($rows as $row) {
             $mainId = $row['id'] ?? null;
             if ($mainId === null) {
                 continue;
             }
-            
+
             if (!isset($groupedByMainId[$mainId])) {
                 // Estrae i dati principali (campi senza prefisso di relazione)
                 $mainData = [];
@@ -998,14 +1010,14 @@ trait HasRelations
                     'relations' => []
                 ];
             }
-            
+
             // Estrae i dati delle relazioni
             foreach ($relationInfo as $relName => $info) {
                 $relatedAlias = $info['relatedAlias'];
                 $relatedClass = $info['relatedClass'];
                 $relatedData = [];
                 $hasData = false;
-                
+
                 // Estrae i campi con prefisso alias_
                 foreach ($row as $key => $value) {
                     $prefix = $relatedAlias . '_';
@@ -1018,7 +1030,7 @@ trait HasRelations
                         $relatedData[$fieldName] = $value;
                     }
                 }
-                
+
                 // Inizializza la relazione se non esiste ancora
                 if (!isset($groupedByMainId[$mainId]['relations'][$relName])) {
                     if ($info['isHasMany'] || ($info['isBelongsToMany'] ?? false)) {
@@ -1027,7 +1039,7 @@ trait HasRelations
                         $groupedByMainId[$mainId]['relations'][$relName] = null;
                     }
                 }
-                
+
                 // Se la relazione ha dati, aggiungili
                 if ($hasData && !empty($relatedData)) {
                     // Per hasMany e belongsToMany, raggruppa più record
@@ -1055,16 +1067,16 @@ trait HasRelations
                 }
             }
         }
-        
+
         // Costruisce i modelli con le relazioni caricate
         foreach ($groupedByMainId as $data) {
             $model = new static($data['main']);
-            
+
             // Carica le relazioni nella cache del modello
             foreach ($data['relations'] as $relName => $relData) {
                 $relInfo = $relationInfo[$relName];
                 $relatedClass = $relInfo['relatedClass'];
-                
+
                 if ($relInfo['isHasMany'] || ($relInfo['isBelongsToMany'] ?? false)) {
                     // Array di modelli correlati (può essere vuoto) - per hasMany e belongsToMany
                     if (is_array($relData) && !empty($relData)) {
@@ -1084,10 +1096,10 @@ trait HasRelations
                     }
                 }
             }
-            
+
             $results[] = $model;
         }
-        
+
         // Se è un singolo risultato (find), restituisce solo il primo elemento
         // Ma per all() restituisce tutti
         return $results;
@@ -1110,7 +1122,7 @@ trait HasRelations
             // Gestisce relazioni annidate (es: 'posts.user')
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
-            
+
             // Verifica se tutti i modelli hanno questo metodo relazione
             $hasRelation = false;
             foreach ($models as $model) {
@@ -1119,24 +1131,26 @@ trait HasRelations
                     break;
                 }
             }
-            
+
             if (!$hasRelation) {
                 continue;
             }
-            
+
             // Carica la relazione per tutti i modelli
             // Le relazioni sono già ottimizzate per usare WHERE invece di leggere tutta la tabella
             foreach ($models as $model) {
                 if (method_exists($model, $firstRelation) && $model->isRelationMethod($firstRelation)) {
                     $relationResult = $model->$firstRelation();
                     $model->relations[$firstRelation] = $relationResult;
-                    
+
                     // Se ci sono relazioni annidate, caricale ricorsivamente
                     if (count($parts) > 1) {
                         $nestedRelations = implode('.', array_slice($parts, 1));
                         $nestedModels = is_array($relationResult) ? $relationResult : [$relationResult];
-                        $nestedModels = array_filter($nestedModels, function($m) { return $m !== null; });
-                        
+                        $nestedModels = array_filter($nestedModels, function ($m) {
+                            return $m !== null;
+                        });
+
                         if (!empty($nestedModels)) {
                             $originalEagerLoad = static::$eagerLoad;
                             static::$eagerLoad = [$nestedRelations];
@@ -1198,7 +1212,7 @@ trait HasRelations
         }
 
         $methodReflection = $reflection->getMethod($method);
-        
+
         // Verifica che sia protetto (come le relazioni dovrebbero essere)
         if (!$methodReflection->isProtected()) {
             return false;
@@ -1221,23 +1235,25 @@ trait HasRelations
     public function load(string|array $relations): static
     {
         $relations = is_array($relations) ? $relations : [$relations];
-        
+
         foreach ($relations as $relation) {
             // Gestisce relazioni annidate (es: 'posts.user')
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
-            
+
             if (method_exists($this, $firstRelation) && $this->isRelationMethod($firstRelation)) {
                 $relationResult = $this->$firstRelation();
                 $this->relations[$firstRelation] = $relationResult;
-                
+
                 // Se ci sono relazioni annidate, caricale ricorsivamente
                 if (count($parts) > 1) {
                     $nestedRelations = implode('.', array_slice($parts, 1));
                     $nestedModels = is_array($relationResult) ? $relationResult : [$relationResult];
                     // Rimuove null dai risultati
-                    $nestedModels = array_filter($nestedModels, function($m) { return $m !== null; });
-                    
+                    $nestedModels = array_filter($nestedModels, function ($m) {
+                        return $m !== null;
+                    });
+
                     if (!empty($nestedModels)) {
                         foreach ($nestedModels as $nestedModel) {
                             $nestedModel->load($nestedRelations);
@@ -1246,7 +1262,7 @@ trait HasRelations
                 }
             }
         }
-        
+
         return $this;
     }
 
@@ -1259,18 +1275,18 @@ trait HasRelations
     public function loadMissing(string|array $relations): static
     {
         $relations = is_array($relations) ? $relations : [$relations];
-        
+
         foreach ($relations as $relation) {
             // Estrae il nome della prima relazione (prima del punto se ci sono relazioni annidate)
             $parts = explode('.', $relation);
             $firstRelation = $parts[0];
-            
+
             // Carica solo se non è già nella cache
             if (!isset($this->relations[$firstRelation])) {
                 $this->load($relation);
             }
         }
-        
+
         return $this;
     }
 
@@ -1295,7 +1311,7 @@ trait HasRelations
                 return $property->getValue();
             }
         }
-        
+
         // Fallback al driver del modello corrente
         return static::$driver;
     }
@@ -1311,7 +1327,7 @@ trait HasRelations
     {
         // Usa il driver del modello correlato (se disponibile) o quello corrente come fallback
         $driver = $this->getRelatedDriver($related);
-        
+
         if ($driver === 'json') {
             return JSONDB::read($related::$collection);
         } else {
@@ -1369,23 +1385,23 @@ trait HasRelations
         // Prova a trovare il nome della relazione guardando i metodi del modello
         $reflection = new \ReflectionClass($this);
         $methods = $reflection->getMethods(\ReflectionMethod::IS_PROTECTED);
-        
+
         foreach ($methods as $method) {
             if ($method->isStatic()) {
                 continue;
             }
-            
+
             $filename = $method->getFileName();
             $startLine = $method->getStartLine();
             $endLine = $method->getEndLine();
             $fileLines = file($filename);
             $methodCode = implode('', array_slice($fileLines, $startLine - 1, $endLine - $startLine + 1));
-            
+
             if (strpos($methodCode, 'belongsToMany') !== false && strpos($methodCode, $related) !== false) {
                 return $method->getName();
             }
         }
-        
+
         // Fallback: usa il nome del modello correlato in lowercase
         return strtolower($this->getModelNameFromClass($related)) . 's';
     }

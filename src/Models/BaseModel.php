@@ -15,22 +15,22 @@ abstract class BaseModel
     public ?string $updated_at = null;
 
     protected static string $collection;
-    
+
     /**
      * Driver database da utilizzare: 'json' o 'database'
      * Può essere sovrascritto nelle classi figlie
      */
     protected static string $driver = 'database';
-    
+
     /**
      * Nome della tabella nel database (se driver = 'database')
      * Se non specificato, usa il valore di $collection
      */
     protected static ?string $table = null;
-    
+
     // Cache delle relazioni caricate
     protected array $relations = [];
-    
+
     // Relazioni da caricare con eager loading (per il prossimo metodo statico chiamato)
     protected static array $eagerLoad = [];
 
@@ -68,7 +68,7 @@ abstract class BaseModel
     public static function with(string|array $relations): static
     {
         static::$eagerLoad = is_array($relations) ? $relations : [$relations];
-        
+
         // Restituisce l'istanza del modello corrente
         return new static();
     }
@@ -79,7 +79,7 @@ abstract class BaseModel
     public static function all(): array
     {
         $rows = [];
-        
+
         if (static::$driver === 'json') {
             $rows = JSONDB::read(static::$collection);
         } else {
@@ -93,16 +93,16 @@ abstract class BaseModel
                 $rows = DB::select("SELECT * FROM " . static::getTableName());
             }
         }
-        
+
         $models = array_map(fn($row) => new static($row), $rows);
-        
+
         // Se ci sono relazioni da caricare con eager loading, caricale
         if (!empty(static::$eagerLoad)) {
             static::eagerLoadRelations($models);
             // Reset dopo l'uso
             static::$eagerLoad = [];
         }
-        
+
         return $models;
     }
 
@@ -135,22 +135,22 @@ abstract class BaseModel
                 $row = $result[0] ?? null;
             }
         }
-        
+
         if (!$row) {
             return null;
         }
-        
+
         // Se le relazioni sono già state caricate con JOIN, il modello è già stato restituito
         // Altrimenti crea il modello normalmente
         $model = new static($row);
-        
+
         // Se ci sono relazioni da caricare con eager loading, caricale
         if (!empty(static::$eagerLoad)) {
             static::eagerLoadRelations([$model]);
             // Reset dopo l'uso
             static::$eagerLoad = [];
         }
-        
+
         return $model;
     }
 
@@ -166,16 +166,16 @@ abstract class BaseModel
     public static function where(string $column, mixed $operator, mixed $value = null, string|array|null $relations = null): array
     {
         $numArgs = func_num_args();
-        
+
         // Se viene passato $relations come parametro (4 argomenti), imposta eagerLoad
         if ($numArgs >= 4 && $relations !== null) {
             static::$eagerLoad = is_array($relations) ? $relations : [$relations];
         }
-        
+
         // Validazione operatore - controlla se $operator è un operatore valido
         $allowedOperators = ['=', '!=', '<>', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN'];
         $operatorUpper = is_string($operator) ? strtoupper($operator) : '';
-        
+
         // Se vengono passati solo 2 parametri, allora $operator è il valore
         // Se vengono passati 3 parametri e $value è null e $operator non è un operatore valido, allora $operator è il valore
         // Se vengono passati 4 parametri, assumiamo sempre che sia ($column, $operator, $value, $relations)
@@ -185,25 +185,25 @@ abstract class BaseModel
         } elseif (is_string($operator)) {
             $operator = $operatorUpper;
         }
-        
+
         // Validazione finale operatore
         if (!in_array($operator, $allowedOperators)) {
             throw new \InvalidArgumentException("Operatore non valido: {$operator}");
         }
-        
+
         $models = [];
-        
+
         if (static::$driver === 'json') {
             // Gestione driver JSON
             $collection = JSONDB::read(static::$collection);
-            $filtered = array_filter($collection, function($item) use ($column, $operator, $value) {
+            $filtered = array_filter($collection, function ($item) use ($column, $operator, $value) {
                 if (!isset($item[$column])) {
                     return false;
                 }
-                
+
                 $columnValue = $item[$column];
-                
-                return match($operator) {
+
+                return match ($operator) {
                     '=' => $columnValue == $value,
                     '!=', '<>' => $columnValue != $value,
                     '>' => $columnValue > $value,
@@ -217,7 +217,7 @@ abstract class BaseModel
                     default => false
                 };
             });
-            
+
             $models = array_map(fn($row) => new static($row), array_values($filtered));
         } else {
             // Gestione driver database
@@ -228,33 +228,40 @@ abstract class BaseModel
                 static::$eagerLoad = [];
                 return $models;
             }
-            
+
             // Query normale senza JOIN
             if (in_array($operator, ['IN', 'NOT IN'])) {
                 // Gestione speciale per IN e NOT IN
                 if (!is_array($value)) {
                     throw new \InvalidArgumentException("Il valore per gli operatori IN/NOT IN deve essere un array");
                 }
-                
-                $placeholders = implode(',', array_fill(0, count($value), '?'));
+
+                // Convertiamo i boolean in interi per evitare problemi con PDO che li converte in stringhe vuote
+                $convertedValues = array_map(function ($val) {
+                    return is_bool($val) ? ($val ? 1 : 0) : $val;
+                }, $value);
+
+                $placeholders = implode(',', array_fill(0, count($convertedValues), '?'));
                 $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} ({$placeholders})";
-                $rows = DB::select($sql, array_values($value));
+                $rows = DB::select($sql, array_values($convertedValues));
             } else {
                 // Query normale con placeholder nominale
+                // Convertiamo i boolean in interi per evitare problemi con PDO che li converte in stringhe vuote
+                $convertedValue = is_bool($value) ? ($value ? 1 : 0) : $value;
                 $sql = "SELECT * FROM " . static::getTableName() . " WHERE {$column} {$operator} :value";
-                $rows = DB::select($sql, ['value' => $value]);
+                $rows = DB::select($sql, ['value' => $convertedValue]);
             }
-            
+
             $models = array_map(fn($row) => new static($row), $rows);
         }
-        
+
         // Se ci sono relazioni da caricare con eager loading, caricale
         if (!empty(static::$eagerLoad)) {
             static::eagerLoadRelations($models);
             // Reset dopo l'uso
             static::$eagerLoad = [];
         }
-        
+
         return $models;
     }
 
@@ -285,8 +292,8 @@ abstract class BaseModel
      */
     public function fill(array $data): static
     {
-        foreach($data as $key => $value) {
-            if(property_exists($this, $key)) {
+        foreach ($data as $key => $value) {
+            if (property_exists($this, $key)) {
                 $this->$key = $value;
             }
         }
@@ -300,7 +307,7 @@ abstract class BaseModel
     {
         $isNew = !isset($this->id);
         $now = date('Y-m-d H:i:s');
-        
+
         // Timestamp di creazione e aggiornamento
         $this->created_at = $this->created_at ?: $now; // ?: elvis operator per assegnare il valore di default se non è settato
         $this->updated_at = $now; // aggiorniamo a prescindere se è nuovo o no
@@ -320,10 +327,19 @@ abstract class BaseModel
             }
             JSONDB::write(static::$collection, $collectionData);
         } else {
-            
+
             // i bindings sono gli array di valori da inserire nella query
             // ['name' => 'Mario', 'email' => 'mario@example.com', ...]
-            $bindings = array_filter($this->toArray(), fn($key) => $key !== 'id', ARRAY_FILTER_USE_KEY);
+            // Rimuoviamo solo 'id' mantenendo tutti i valori, anche quelli falsy (false, 0, '', null)
+            $allData = $this->toArray();
+            $bindings = array_diff_key($allData, ['id' => null]);
+
+            // Convertiamo i valori boolean in interi (0/1)
+            foreach ($bindings as $key => $value) {
+                if (is_bool($value)) {
+                    $bindings[$key] = $value ? 1 : 0;
+                }
+            }
 
             // dobbiamo ottenere i nomi delle colonne per la query nel formato:
             // ['name', 'email', ...]
@@ -353,14 +369,14 @@ abstract class BaseModel
     public function delete(): int
     {
         $result = 0;
-        if(static::$driver === 'json') {
+        if (static::$driver === 'json') {
             $collection = static::all();
             $newCollection = array_filter($collection, fn($item) => $item->id !== $this->id);
             $result = JSONDB::write(static::$collection, $newCollection);
         } else {
             $result = DB::delete("DELETE FROM " . static::getTableName() . " WHERE id = :id", ['id' => $this->id]);
         }
-        if($result === 0) {
+        if ($result === 0) {
             throw new \Exception("Errore durante l'eliminazione dell'utente");
         }
         return $result;
@@ -380,11 +396,11 @@ abstract class BaseModel
         if ($method === 'find' && !empty($arguments)) {
             return static::find($arguments[0]);
         }
-        
+
         if ($method === 'all' && empty($arguments)) {
             return static::all();
         }
-        
+
         // Se viene chiamato where() su un'istanza restituita da with(),
         // chiama il metodo statico corrispondente mantenendo lo stato di eagerLoad
         if ($method === 'where' && count($arguments) >= 2) {
@@ -418,7 +434,7 @@ abstract class BaseModel
         foreach ($this->relations as $relationName => $relationData) {
             if (is_array($relationData)) {
                 // Relazione hasMany: array di modelli (può essere vuoto)
-                $result[$relationName] = array_map(function($model) {
+                $result[$relationName] = array_map(function ($model) {
                     return $model instanceof BaseModel ? $model->toArray() : $model;
                 }, $relationData);
             } elseif ($relationData instanceof BaseModel) {
